@@ -1,0 +1,14 @@
+services:
+  # MongoDB is hosted online in MongoDB Atlas for this project.
+  # Run only Redis locally for the event worker during local development.
+  redis:
+    image: redis:7-alpine
+    container_name: linkpulse-redis
+    command: ["redis-server", "--appendonly", "yes"]
+    ports:
+      - "6379:6379"
+    volumes:
+      - linkpulse_redis_data:/data
+    restart: unless-stopped
+volumes:
+  linkpulse_redis_data:

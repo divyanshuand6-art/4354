@@ -1,0 +1,85 @@
+# LinkPulse Render Blueprint
+# Create an Atlas cluster separately, then supply MONGODB_URI when prompted.
+# The default service slugs below provide the frontend/API origins. If Render
+# assigns different onrender.com URLs, update these two values in service settings.
+services:
+  - type: keyvalue
+    name: linkpulse-queue
+    region: singapore
+    plan: free
+    maxmemoryPolicy: noeviction
+    persistenceMode: off
+    ipAllowList: []
+
+  - type: web
+    name: linkpulse-api
+    runtime: node
+    region: singapore
+    plan: free
+    rootDir: backend
+    buildCommand: npm install
+    startCommand: npm start
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: NODE_VERSION
+        value: "22"
+      - key: MONGODB_URI
+        sync: false
+      - key: JWT_SECRET
+        generateValue: true
+      - key: VISITOR_HASH_SECRET
+        generateValue: true
+      - key: FRONTEND_ORIGIN
+        value: https://linkpulse-frontend.onrender.com
+      - key: PUBLIC_BASE_URL
+        fromService:
+          type: web
+          name: linkpulse-api
+          envVarKey: RENDER_EXTERNAL_URL
+      - key: TRUST_PROXY
+        value: "true"
+
+  - type: worker
+    name: linkpulse-worker
+    runtime: node
+    region: singapore
+    plan: free
+    rootDir: backend
+    buildCommand: npm install
+    startCommand: npm run worker
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: NODE_VERSION
+        value: "22"
+      - key: MONGODB_URI
+        fromService:
+          type: web
+          name: linkpulse-api
+          envVarKey: MONGODB_URI
+      - key: REDIS_URL
+        fromService:
+          type: keyvalue
+          name: linkpulse-queue
+          property: connectionString
+
+  - type: web
+    name: linkpulse-frontend
+    runtime: static
+    rootDir: frontend
+    buildCommand: npm install && npm run build
+    staticPublishPath: dist
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html
+    envVars:
+      - key: VITE_API_BASE_URL
+        value: https://linkpulse-api.onrender.com
+      # Set this to your redirect domain (for example https://go.example.com)
+      # after attaching it to the API service in Render. Until then it uses the
+      # API's public Render URL, which is already reachable from the internet.
+      - key: VITE_PUBLIC_BASE_URL
+        value: https://linkpulse-api.onrender.com
